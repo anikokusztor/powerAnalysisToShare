@@ -1,11 +1,14 @@
 ---
-title: "Power Analysis"
-output: html_notebook
+title: "PowerAnalysis"
+author: "Aniko Kusztor"
+date: "2024-10-28"
+output: html_document
 params:
   sample_size: [100,200]
   effect_size: 0.25
   nsim: 10
 ---
+
 
 Written by: Aniko Kusztor
 
@@ -148,7 +151,7 @@ for (iii in sample_sizes){
   for (ii in 1:nsim){
     tstartfull <- Sys.time()
     tstartfull_format <- format(tstartfull, "%Y-%m-%d %H:%M:%S")  # Force readable format
-    cat('Starting simulation', sim, 'of', nsim, 'at', tstartfull_format, '\n')
+    cat('Starting simulation', ii, 'of', nsim, 'at', tstartfull_format, '\n')
 
   simdataset <- data.frame()  # Use data.table for efficiency?
   simdataset <- simData(simdataset,iii,CDSslope)
@@ -175,7 +178,6 @@ for (iii in sample_sizes){
 }
 cat("Simulation done!","\n")
 
-
 ```
 
 Okay, now let's see the data.
@@ -196,3 +198,4 @@ ggplot(plot_data, aes(x = Sample_Size, y = Power)) +
   theme_bw(base_size = 18)
 
 ```
+
