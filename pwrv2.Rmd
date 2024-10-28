@@ -3,23 +3,15 @@ title: "PowerAnalysis"
 author: "Aniko Kusztor"
 date: "2024-10-28"
 output: html_document
-params:
-  sample_size: [100,200]
-  effect_size: 0.25
-  nsim: 10
 ---
-
 
 Written by: Aniko Kusztor
 
 ### Explanation
 
-This code mirrors your initial structure but is adapted for a notebook format:
-
-1.  **Parameters**: Set the number of simulations, sample sizes, and `CDSslope`.
-2.  **Function Definition**: `simData` simulates data for each sample size, retaining your exact logic.
-3.  **Simulation Loop**: For each sample size, it simulates data, fits the model, and extracts p-values.
-4.  **Power Calculation and Plot**: Computes the proportion of significant p-values and visualizes the power curve.
+1.  **Function Definition**: `simData` simulates data for a given sample size (nsub parameter) with a given coefficient (CDSslope parameter). The means, standard deviations and other parameters were based on the pilot data.
+2.  **Simulation Loop**: For each sample size, it simulates data, fits the model, and extracts p-values.
+3.  **Power Calculation and Plot**: Computes the proportion of significant p-values and visualizes the power curve.
 
 Each chunk in this notebook can be run sequentially, allowing for interactive analysis and visualization.
 
@@ -129,19 +121,15 @@ simData <- function(outdata, nsub, CDSslope) {
 
 ```
 
-Next we are running simulations.
+Next we are running simulations. This can take up to an hour for one effect size. 
 
 ```{r}
 # Set parameters
 set.seed(786)  # For reproducibility
-#nsim <- 10
-#sample_sizes <- c(100,200)
-#CDSslope <- 0.5
+nsim <- 100
+sample_sizes <- c(250,500,750)
+CDSslope <- 0.3
 
-# Access parameters using params$param_name
-sample_sizes <- params$sample_size
-CDSslope <- params$effect_size
-nsim <- params$nsim
 
 p_values <- data.frame()
 colnum <- 0
@@ -199,3 +187,43 @@ ggplot(plot_data, aes(x = Sample_Size, y = Power)) +
 
 ```
 
+Plot simulated data
+
+```{r}
+# import already simulated data
+p_values_sim <- readRDS("combined_p_values_100run_ssize250-500-750.rds")
+# Define sample sizes c
+ssizes <- c(250, 500, 750)
+
+# Calculate power for each sample size and effect size
+plot_data <- data.frame()
+
+# Loop through each effect size
+for (effect_size in unique(p_values_sim$Effect_Size)) {
+  # Subset data for the current effect size
+  subset_data <- subset(p_values_sim, Effect_Size == effect_size)
+  # Calculate power for each sample size 
+  power_results <- sapply(subset_data[, c("V1", "V2", "V3")], function(column) {
+    mean(column < 0.05, na.rm = TRUE)  # Calculate power (proportion of significant p-values)
+  })
+  # Create a data frame for the current effect size
+  effect_data <- data.frame(
+    Sample_Size = ssizes,
+    Power = power_results,
+    Effect_Size = paste("Effect Size", effect_size)
+  )
+  # Append
+  plot_data <- rbind(plot_data, effect_data)
+}
+
+
+ggplot(plot_data, aes(x = Sample_Size, y = Power, color = Effect_Size, group = Effect_Size)) +
+  geom_line(size = 1) +
+  geom_point(size = 2, color = "black") +
+  scale_x_continuous(limits=c(245,755), breaks=ssizes) +
+  scale_y_continuous(limits=c(0,1.0), breaks=seq(0,1.0,0.2)) +
+  labs(title = "Power Curve",x = "Sample Size", y = "Power") +
+  theme_bw(base_size = 18)
+
+
+```
