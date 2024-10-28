@@ -182,7 +182,7 @@ cat("Simulation done!","\n")
 
 Okay, now let's see the data.
 
-```{r echo=FALSE}
+```{r}
 
 # Calculate power for each sample size
 power_results <- colMeans(p_values < 0.05, na.rm = TRUE)
