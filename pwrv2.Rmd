@@ -245,9 +245,9 @@ ggplot(plot_data, aes(x = Sample_Size, y = Power, color = Effect_Size, group = E
 
 ### Bayesian model example
 
-To test the Bayesian model comparison code, we simulate data using the same function as before. We set-up the priors and formulas. Then we specify the brm models. The current specification are optimised for within-chain parallelisation using the cmdstanr backend on 8 available cores. In addition, we use high iter number as this has been recommended for calculating the Bayes Factor reliably. (See: Schad et al., 2023, DOI: https://doi.org/10.1037/met0000472)
+To test the Bayesian model comparison code, we simulate data using the same function as before. We set-up the priors and formulas. Then we specify the brm models. The current specification are optimised for within-chain parallelisation using the cmdstanr backend on 8 available cores. In addition, we normally would use higher iter numbers (i.e. MCMC samples) as this has been recommended for calculating the Bayes Factor reliably. (See: Schad et al., 2023, DOI: https://doi.org/10.1037/met0000472)
 
-To test this, we recommend to decrease the participant number, and potentially decrease iter and warmup values. 
+To test this code, we recommend to decrease the participant number. We have also decreased the iter and warmup values from 10000 and 2000 to 2000 and 500. 
 
 ```{r}
 
@@ -286,8 +286,8 @@ model<- brm(formula = formula,
             cores = 4,
             backend = "cmdstanr",
             threads = threading(2),
-            iter = 10000, #10000,
-            warmup = 2000, #2000,
+            iter = 2000, #10000,
+            warmup = 500, #2000,
             control=list(adapt_delta=0.99,max_treedepth=15),
             save_pars = save_pars(all = TRUE),
             sig_figs = 10,
@@ -301,8 +301,8 @@ modelnull <- brm(formula = formulanull,
                  cores = 4,
                  backend = "cmdstanr",
                  threads = threading(2),
-                 iter = 10000, 
-                 warmup = 2000,
+                 iter = 2000, #10000,
+                 warmup = 500, #2000,
                  control=list(adapt_delta=0.99,max_treedepth=15),
                  save_pars = save_pars(all = TRUE),
                  sig_figs = 10,
