@@ -5,7 +5,7 @@ date: "2024-10-28"
 output: html_document
 ---
 
-Written by: Aniko Kusztor
+Written by: Anikó Kusztor
 
 ### Explanation
 
@@ -21,9 +21,20 @@ library(dplyr)
 library(truncnorm)
 library(ordinal)
 library(ggplot2)
+library(brms)
+library(cmdstanr)
+
 ```
 
-First we need to simulate data.
+First we need to simulate data. We have 25 emotion categories, in each category we have 20 different videos adding up to 500 stimuli. We simulate the random intercepts for each stimulus and then select 75 videos (3 random videos from each category). Next, for each participant we simulate CDS scores and random intercept. Finally, we simulate the emotional intensity ratings, which are on an order Likert-scale between 1-8. Since we plan to analyse the data with cumulative logit models (a.k.a. ordinal logistic regression), we will generate the ratings via the following steps:
+
+- We use the cut-off point from the pilot data. They determine the initial probability of each ordinal outcome. In other words, they determine how likely each emotional rating option is. 
+
+- We set-up a linear predictor for each rating category. We include the random effects here and also the CDS scores and their slope coefficient.
+
+- We compute cumulative probabilities for each threshold, which are then used to compute probabilities for each ordinal category. 
+
+- Finally, we simulate ratings based on the probabilities.
 
 ```{r}
 simData <- function(outdata, nsub, CDSslope) {
@@ -66,7 +77,7 @@ simData <- function(outdata, nsub, CDSslope) {
     }
     artificial_data$CDSstate <- rep(simCDSsum, length(sampled_stim$stimID))
     artificial_data$PROLIFIC_PID <- rep(i, length(sampled_stim$stimID))
-    artificial_data$CDSstateS <- (artificial_data$CDSstate - 38) / 34
+    artificial_data$CDSstateS <- (artificial_data$CDSstate - 38) / 34 #scale CDS score
     
     # Subject random intercept
     SDsub <- sqrt(1.16)
@@ -74,7 +85,7 @@ simData <- function(outdata, nsub, CDSslope) {
     
     #add ratings
     # based mean and SD of estimates in all models on the pilot data 
-    # the betas need to maintain b01>b02>...>b07
+    # these need to maintain b01>b02>...>b07
     
     b01 <- -2.91
     b02 <- -1.88
@@ -121,7 +132,9 @@ simData <- function(outdata, nsub, CDSslope) {
 
 ```
 
-Next we are running simulations. This can take up to an hour for one effect size. 
+Next we are running simulations. In each run, we simulate a new dataset, then select 1 emotion category and subset the data. After that, we fit a cumulative logit model with random intercepts for participant and stimuli. Finally we extract the p-values.
+
+This can take up to an hour for one effect size with the current parameters. To test the simulation, decrease values in nsim ans sample_sizes variables. 
 
 ```{r}
 # Set parameters
@@ -168,7 +181,7 @@ cat("Simulation done!","\n")
 
 ```
 
-Okay, now let's see the data.
+Okay, now let's see the data. We calculate the proportions of p-value below 0.05 and plot them in each sample sizes.
 
 ```{r}
 
@@ -187,7 +200,9 @@ ggplot(plot_data, aes(x = Sample_Size, y = Power)) +
 
 ```
 
-Plot simulated data
+### Plot simulated data
+
+To reproduce our plot, run the section below. This imports simulated data from 100 simulation runs, with 3 sample sizes (250, 500, 750) and with 3 effec sizes (0.1, 0.2, 0.3).
 
 ```{r}
 # import already simulated data
@@ -227,3 +242,76 @@ ggplot(plot_data, aes(x = Sample_Size, y = Power, color = Effect_Size, group = E
 
 
 ```
+
+### Bayesian model example
+
+To test the Bayesian model comparison code, we simulate data using the same function as before. We set-up the priors and formulas. Then we specify the brm models. The current specification are optimised for within-chain parallelisation using the cmdstanr backend on 8 available cores. In addition, we use high iter number as this has been recommended for calculating the Bayes Factor reliably. (See: Schad et al., 2023, DOI: https://doi.org/10.1037/met0000472)
+
+To test this, we recommend to decrease the participant number, and potentially decrease iter and warmup values. 
+
+```{r}
+
+priors_mixed <- c(
+  set_prior('normal(0, 1)', class = 'b'),
+  set_prior('exponential(1)', class = 'sd', group = 'vidName_Cat'),
+  set_prior('exponential(1)', class = 'sd', group = 'PROLIFIC_PID')) 
+
+priors_mixednull <- c(
+  set_prior('exponential(1)', class = 'sd', group = 'vidName_Cat'),
+  set_prior('exponential(1)', class = 'sd', group = 'PROLIFIC_PID')) 
+
+model <- NaN
+modelnull<- NaN
+
+# formulas for full and null model
+formulanull = emoIntenseF ~ 1 + (1|PROLIFIC_PID) + (1|vidName_Cat)
+formula = emoIntenseF ~ 1 + CDSstateS + (1|PROLIFIC_PID) + (1|vidName_Cat)
+
+
+simdataset <- data.frame()  # Use data.table for efficiency
+simdataset <- simData(simdataset,500,-0.1) # simulate data
+  
+simdataset$emoIntenseF <- ordered(simdataset$emoIntense)
+simdataset$vidName_Cat <- factor(simdataset$vidName_Cat)
+simdataset$PROLIFIC_PID <- factor(simdataset$PROLIFIC_PID)
+  
+emo_cats <- unique(simdataset$EmoCat2)
+subset_data <- subset(simdataset, EmoCat2 == "Admiration") #this is just a random choice
+
+model<- brm(formula = formula,
+            family = cumulative,
+            prior = priors_mixed,
+            init = 0.2,
+            chain = 4,
+            cores = 4,
+            backend = "cmdstanr",
+            threads = threading(2),
+            iter = 10000, #10000,
+            warmup = 2000, #2000,
+            control=list(adapt_delta=0.99,max_treedepth=15),
+            save_pars = save_pars(all = TRUE),
+            sig_figs = 10,
+            data = subset_data)
+    
+modelnull <- brm(formula = formulanull,
+                 family = cumulative,
+                 prior = priors_mixednull,
+                 init = 0.2,
+                 chain = 4,
+                 cores = 4,
+                 backend = "cmdstanr",
+                 threads = threading(2),
+                 iter = 10000, 
+                 warmup = 2000,
+                 control=list(adapt_delta=0.99,max_treedepth=15),
+                 save_pars = save_pars(all = TRUE),
+                 sig_figs = 10,
+                 data = subset_data)
+  
+bayes_factor(model,modelnull)$bf
+
+```
+
+
+
+_For question and comments: kusztoraniko@gmail.com_
