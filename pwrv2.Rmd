@@ -269,7 +269,7 @@ formula = emoIntenseF ~ 1 + CDSstateS + (1|PROLIFIC_PID) + (1|vidName_Cat)
 
 
 simdataset <- data.frame()  # Use data.table for efficiency
-simdataset <- simData(simdataset,500,-0.1) # simulate data
+simdataset <- simData(simdataset,500,-0.2) # simulate data
   
 simdataset$emoIntenseF <- ordered(simdataset$emoIntense)
 simdataset$vidName_Cat <- factor(simdataset$vidName_Cat)
